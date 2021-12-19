@@ -48,7 +48,7 @@ fun main() {
 
     val initialState = input.first().split(",").map { it.toInt() }
     val finalState = simulateDays(initialState, 80)
-    val totalFishes = simulateByDays(initialState, 256)
+    val totalFish = simulateByDays(initialState, 256)
     println(finalState.size)
-    println(totalFishes)
+    println(totalFish)
 }
