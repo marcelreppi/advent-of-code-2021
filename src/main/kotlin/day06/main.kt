@@ -19,8 +19,8 @@ tailrec fun simulateDays(state: List<Int>, days: Int): List<Int> {
 }
 
 // All fish that have the same day can be simulated at once
-// Therefore we store counts of fishes for each day and advance them all at once
-// All fishes of day 0 are reset to day 6 and also the same amount of fishes are added to day 8
+// Therefore we store counts of fish for each day and advance them all at once
+// All fish of day 0 are reset to day 6 and also the same amount of fish are added to day 8
 fun simulateByDays(initialState: List<Int>, days: Long): Long {
     var fishCountsPerDay = MutableList(9) { 0L }
     for (f in initialState) {
