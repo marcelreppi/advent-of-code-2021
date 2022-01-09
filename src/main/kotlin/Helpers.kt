@@ -15,7 +15,29 @@ data class Point2D(val x: Int, val y: Int) {
 
         val steps = maxOf(abs((x - other.x)), abs((y - other.y)))
 
-        return (1 .. steps).scan(this) { prev, _ -> Point2D(prev.x + xDelta, prev.y + yDelta) }
+        return (1..steps).scan(this) { prev, _ -> Point2D(prev.x + xDelta, prev.y + yDelta) }
+    }
+
+    infix fun <T> isWithin(grid: List<List<T>>): Boolean {
+        return y in grid.indices && x in grid.first().indices
+    }
+
+    fun getAdjacentPoints(includeDiagonal: Boolean = false): List<Point2D> {
+        val horizontalAndVerticalNeighbors = listOf(
+            Point2D(x, y - 1), // Top
+            Point2D(x + 1, y), // Right
+            Point2D(x, y + 1), // Bottom
+            Point2D(x - 1, y)  // Left
+        )
+        if (!includeDiagonal) return horizontalAndVerticalNeighbors
+
+        val diagonalNeighbors = listOf(
+            Point2D(x - 1, y - 1), // Top Left
+            Point2D(x + 1, y - 1), // Top Right
+            Point2D(x - 1, y + 1), // Bottom Left
+            Point2D(x + 1, y + 1), // Bottom Right
+        )
+        return horizontalAndVerticalNeighbors + diagonalNeighbors
     }
 }
 
@@ -67,4 +89,16 @@ data class Point3D(val x: Int, val y: Int, val z: Int) {
 
 fun <T> printGrid(grid: List<List<T>>, transformer: (T) -> String) {
     grid.forEach { row -> println(row.joinToString("", transform = transformer)) }
+}
+
+fun getAdjacentPoints(
+    x: Int,
+    y: Int,
+    includeDiagonal: Boolean = false
+): List<Point2D> {
+    return Point2D(x, y).getAdjacentPoints(includeDiagonal)
+}
+
+fun <T> isWithin(x: Int, y: Int, grid: List<List<T>>): Boolean {
+    return Point2D(x, y) isWithin grid
 }
