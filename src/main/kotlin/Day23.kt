@@ -4,14 +4,20 @@ import kotlin.math.abs
 class Day23(input: List<String>) {
     private val initialState = parseInput(input)
 
+    private fun parseSlots(input: String): List<Char> {
+        return Regex("[A-Z]").findAll(input)
+            .toList()
+            .map { it.value.toCharArray().first() }
+    }
+
     private fun parseInput(input: List<String>): State {
         val hallway = Regex("(\\.)+").find(input[1])!!.value
-        val roomSlot2 = Regex("[A-Z]").findAll(input[2]).toList().map { it.value }
-        val roomSlot1 = Regex("[A-Z]").findAll(input[3]).toList().map { it.value }
+        val roomSlot1 = parseSlots(input[3])
+        val roomSlot2 = parseSlots(input[2])
 
         val rooms = (roomSlot1 zip roomSlot2)
             .mapIndexed { i, slots ->
-                Room(slots.toList().map { it.toCharArray().first() }, (i + 65).toChar(), 2)
+                Room(slots.toList(), (i + 65).toChar(), 2)
             }
         return State(hallway, rooms)
     }
@@ -25,7 +31,7 @@ class Day23(input: List<String>) {
         fun containsUnwantedAmphipod(): Boolean = slots.any { it != destinationFor }
 
         fun enter(amphipod: Char): Room {
-            if (amphipod != destinationFor) throw Error("wtf")
+            if (amphipod != destinationFor) throw Error("Not allowed")
             val nextSlots = slots.toMutableList().apply { add(amphipod) }
             return Room(nextSlots, destinationFor, targetSize)
         }
@@ -47,20 +53,20 @@ class Day23(input: List<String>) {
 
         fun getRoomToHallwayTransitionStates(): List<State> {
             return rooms
-                .filter { !it.isTargetState() && !it.isEmpty() && !it.isPartiallyTargetState() }
+                .filter { !it.isTargetState() && !it.isPartiallyTargetState() && !it.isEmpty() }
                 .flatMap { room ->
                     val amphipod = room.slots.last()
                     hallway.indices
                         .filter { index ->
                             val notInFrontOfRoom = index !in rooms.map { it.hallwayIndex }
-                            val nothingBlockingTheWay = (minOf(
-                                index,
-                                room.hallwayIndex
-                            )..maxOf(
-                                index,
-                                room.hallwayIndex
-                            )).all { hallway[it] == '.' }
-                            // Maybe filter deadlocks?
+
+                            val fromHallwayIndex = minOf(index, room.hallwayIndex)
+                            val toHallwayIndex = maxOf(index, room.hallwayIndex)
+                            val nothingBlockingTheWay = (fromHallwayIndex..toHallwayIndex)
+                                .all { hallway[it] == '.' }
+
+                            // Possible improvement: Recognize and filter deadlocks?
+
                             notInFrontOfRoom && nothingBlockingTheWay
                         }
                         .map { index ->
@@ -76,7 +82,7 @@ class Day23(input: List<String>) {
                 }
         }
 
-        fun getHallwayToRoomTransitions(): List<State> {
+        fun getHallwayToRoomTransitionStates(): List<State> {
             return hallway.indices
                 .filter { hallway[it] != '.' }
                 .flatMap { index ->
@@ -85,11 +91,12 @@ class Day23(input: List<String>) {
                         .filter { room ->
                             val roomNotDone = !room.isTargetState()
                             val allowedToEnter = !room.containsUnwantedAmphipod() && room.destinationFor == amphipod
-                            val nothingBlockingTheWay =
-                                (minOf(index, room.hallwayIndex)..maxOf(
-                                    index,
-                                    room.hallwayIndex
-                                )).all { hallway[it] == if (it == index) amphipod else '.' }
+
+                            val fromHallwayIndex = minOf(index, room.hallwayIndex)
+                            val toHallwayIndex = maxOf(index, room.hallwayIndex)
+                            val nothingBlockingTheWay = (fromHallwayIndex..toHallwayIndex)
+                                .all { hallway[it] == if (it == index) amphipod else '.' }
+
                             roomNotDone && allowedToEnter && nothingBlockingTheWay
                         }
                         .map { room ->
@@ -106,10 +113,12 @@ class Day23(input: List<String>) {
         }
     }
 
-    private fun solve(): Int {
+    private fun solve(initialState: State): Int {
         val energyComparator: Comparator<State> = compareBy { state -> state.totalEnergy }
         val statesToExplore: PriorityQueue<State> = PriorityQueue(energyComparator)
         statesToExplore.add(initialState)
+
+        val minEnergyPerState = mutableMapOf(initialState to initialState.totalEnergy)
 
         while (statesToExplore.isNotEmpty()) {
             val state = statesToExplore.remove()
@@ -117,10 +126,13 @@ class Day23(input: List<String>) {
             if (state.isTargetState()) return state.totalEnergy
 
             val roomToHallwayTransitions = state.getRoomToHallwayTransitionStates()
-            val hallwayToRoomTransitions = state.getHallwayToRoomTransitions()
+            val hallwayToRoomTransitions = state.getHallwayToRoomTransitionStates()
+            val nextStates = (roomToHallwayTransitions + hallwayToRoomTransitions).filter {
+                it.totalEnergy < (minEnergyPerState[it] ?: Int.MAX_VALUE)
+            }
+            nextStates.forEach { minEnergyPerState[it] = it.totalEnergy }
 
-            statesToExplore.addAll(roomToHallwayTransitions)
-            statesToExplore.addAll(hallwayToRoomTransitions)
+            statesToExplore.addAll(nextStates)
         }
 
         return -1
@@ -128,12 +140,23 @@ class Day23(input: List<String>) {
 
 
     fun solvePart1(): Int {
-        return solve()
+        return solve(initialState)
+
     }
 
     fun solvePart2(): Int {
-        // TODO: Switch from Dijkstra to A*
-        return 0
+        val extraRoomSlot1 = parseSlots("#D#B#A#C#")
+        val extraRoomSlot2 = parseSlots("#D#C#B#A#")
+        val slotPairs = (extraRoomSlot1 zip extraRoomSlot2)
+        val newRooms = initialState.rooms.toMutableList().map { room ->
+            val newSlots = room.slots.toMutableList().apply {
+                addAll(1, slotPairs[room.roomIndex].toList())
+            }
+            room.copy(slots = newSlots, targetSize = newSlots.size)
+        }
+        val newInitialState = initialState.copy(rooms = newRooms)
+
+        return solve(newInitialState)
     }
 }
 
